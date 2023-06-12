@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+const jwt = require('jsonwebtoken');
 require("dotenv").config();
 const cors = require('cors');
 const port = process.env.PORT || 5000;
@@ -7,6 +8,8 @@ const port = process.env.PORT || 5000;
 //middleware
 app.use(cors());
 app.use(express.json());
+
+
 
 
 
@@ -29,6 +32,11 @@ async function run() {
 
     const usersCollection = client.db("yogaDB").collection("users");
 
+    app.post('/jwt', (req, res)=> {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1hr'});
+      res.send({token})
+    })
 
     //user related apis
     app.get('/users', async (req, res) => {
