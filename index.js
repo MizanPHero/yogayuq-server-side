@@ -112,6 +112,13 @@ async function run() {
       res.send(result);
     })
 
+    app.get('/classfeedback/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await classesCollection.findOne(query);
+      res.send(result);
+    })
+
     app.post('/classes', async (req, res) => {
       const body = req.body;
       const result = await classesCollection.insertOne(body)
@@ -131,6 +138,18 @@ async function run() {
       res.send(result);
     })
 
+    app.put('/classfeedback/:id', async (req, res) => {
+      const body = req.body;
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updateDoc = {
+        $set: {
+          feedback: body.feedback
+        }
+      };
+      const result = await classesCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
 
 
     app.patch('/class/deny/:id', async (req, res) => {
