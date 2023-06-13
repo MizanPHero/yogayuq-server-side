@@ -119,6 +119,17 @@ async function run() {
       res.send(result);
     })
 
+    app.get('/popularclasses', async (req, res) => {
+      const query = { enrolled: { $gte: 0 } };
+      const options = {
+        sort: { enrolled: -1 }
+      };
+
+      const cursor = classesCollection.find(query, options);
+      const result = await cursor.toArray();
+      return res.send(result);
+    })
+
     app.post('/classes', async (req, res) => {
       const body = req.body;
       const result = await classesCollection.insertOne(body)
