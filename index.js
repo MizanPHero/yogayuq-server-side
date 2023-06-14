@@ -11,6 +11,25 @@ app.use(express.json());
 
 
 
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ error: true, message: 'unauthorized access' });
+  }
+  // bearer token
+  const token = authorization.split(' ')[1];
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ error: true, message: 'unauthorized access' })
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
+
+
+
 
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
@@ -35,6 +54,7 @@ async function run() {
 
     const usersCollection = client.db("yogaDB").collection("users");
     const classesCollection = client.db("yogaDB").collection("classes");
+    const cartsCollection = client.db("yogaDB").collection("carts");
 
     app.post('/jwt', (req, res) => {
       const user = req.body;
@@ -46,6 +66,13 @@ async function run() {
     app.get('/users', async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
+    })
+    app.get('/users/instructors', async (req, res) => {
+      const query = {role: 'instructor'};
+
+      const cursor = usersCollection.find(query);
+      const result = await cursor.toArray();
+      return res.send(result);
     })
 
     app.post('/users', async (req, res) => {
@@ -88,11 +115,16 @@ async function run() {
 
 
     //class related apis
-    app.get('/classes', async (req, res) => {
+    app.get('/classes', verifyJWT, async (req, res) => {
       const email = req.query.email;
     
       if (!email) {
         res.send([]);
+      }
+
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'forbidden access' })
       }
     
       const query = { instructorEmail: email };
@@ -175,6 +207,46 @@ async function run() {
       const result = await classesCollection.updateOne(filter, updateDoc);
       res.send(result);
     })
+
+
+
+    // cart apis
+
+    app.post('/carts', async (req, res) => {
+      const body = req.body;
+      const result = await cartsCollection.insertOne(body)
+      res.send(result)
+    })
+
+    app.get('/carts', verifyJWT, async (req, res) => {
+      const email = req.query.email;
+    
+      if (!email) {
+        res.send([]);
+      }
+
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'forbidden access' })
+      }
+
+
+      const query = { email: email };
+      const result = await cartsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
+    app.delete('/carts/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await cartsCollection.deleteOne(query);
+      res.send(result);
+    })
+
+
+
+
 
 
 
