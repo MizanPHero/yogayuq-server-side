@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const jwt = require('jsonwebtoken');
 require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const cors = require('cors');
 const port = process.env.PORT || 5000;
 
@@ -55,6 +56,7 @@ async function run() {
     const usersCollection = client.db("yogaDB").collection("users");
     const classesCollection = client.db("yogaDB").collection("classes");
     const cartsCollection = client.db("yogaDB").collection("carts");
+    const paymentsCollection = client.db("yogaDB").collection("payments");
 
     app.post('/jwt', (req, res) => {
       const user = req.body;
@@ -275,8 +277,51 @@ async function run() {
     })
 
 
+    // create payment intent
+    app.post("/create-payment", verifyJWT, async (req, res)=>{
+      const {price} = req.body;
+      console.log(price);
+      const cents = parseFloat(price * 100);
+      const intent = await stripe.paymentIntents.create({
+        amount: cents,
+        currency: 'usd',
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+      res.send({clientSecret: intent?.client_secret})
+    })
 
 
+
+    // payments api 
+    app.post('/payments', verifyJWT, async (req, res) => {
+      const body = req.body;
+      const result = await paymentsCollection.insertOne({...body, date: new Date()});
+      const {enrolled, seat} = await classesCollection.findOne({_id: new ObjectId(body.classId)});
+      await classesCollection.updateOne({_id: new ObjectId(body.classId)}, {$set: {enrolled: enrolled + 1, seat: seat - 1}});
+      await cartsCollection.deleteOne({_id: new ObjectId(body.cardId)});
+      res.send(result);
+    })
+
+
+    app.get('/payments', verifyJWT, async (req, res) => {
+      const email = req.query.email;
+    
+      if (!email) {
+        res.send([]);
+      }
+    
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'forbidden access' });
+      }
+    
+      const query = { email: email };
+      const result = await paymentsCollection.find(query).sort({ date: -1 }).toArray();
+      res.send(result);
+    });
+    
 
 
 
